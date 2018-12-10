@@ -1,5 +1,6 @@
 package project.aggnode;
 
+import com.sun.spot.io.j2me.radiogram.Radiogram;
 import com.sun.spot.io.j2me.radiogram.RadiogramConnection;
 import com.sun.spot.peripheral.Spot;
 import com.sun.spot.resources.Resources;
@@ -12,36 +13,49 @@ import com.sun.spot.resources.transducers.ITemperatureInput;
 
 import com.sun.spot.sensorboard.peripheral.ADT7411Event;
 import com.sun.spot.sensorboard.peripheral.IADT7411ThresholdListener;
+import com.sun.spot.util.IEEEAddress;
+import com.sun.spot.util.Utils;
 
 import java.io.IOException;
 import javax.microedition.io.Connector;
 import javax.microedition.io.Datagram;
 import javax.microedition.midlet.MIDlet;
 import javax.microedition.midlet.MIDletStateChangeException;
+import project.CommonTypes;
 import project.SpotCommons;
 
 public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
-        IConditionListener {
+        IConditionListener, LocateServiceListener, CommonTypes, PacketHandler {
 
+    private static final long SERVICE_CHECK_INTERVAL = 10000;
     private final int RX_NODE_PORT = 112;
     private final String SERVER_MAC = "7f00.0101.0000.1001";
     private final int SERVER_TX_PORT = 111;
     private final String MY_MAC = SpotCommons.getMyMAC(Spot.getInstance());
-
     private RadiogramConnection txServerConn = null;
     private Datagram txServerDatagram;
-
     private long heartbeatInterval = 10 * 1000; // interval in milliseconds
     private long lastHeartbeatTimestamp = 0L;
-    private ILightSensor light = (ILightSensor)Resources.lookup(ILightSensor.class);
+    private ILightSensor light = (ILightSensor) Resources.lookup(ILightSensor.class);
     private ITemperatureInput temp = (ITemperatureInput) Resources.lookup(ITemperatureInput.class);
     private IAccelerometer3D accel = (IAccelerometer3D) Resources.lookup(IAccelerometer3D.class);
-
     private Node nodeList[] = new Node[3];
     private int nodeCount = 0;
+    private LocateService locator;
+    private RadiogramConnection hostConn;
+    private PacketReceiver rcvr;
+    private PacketTransmitter xmit;
+    private boolean connected = false;
 
-    protected void startApp() throws MIDletStateChangeException {
+    private void initialize() {
+        locator = new LocateService(this, BROADCAST_PORT, SERVICE_CHECK_INTERVAL,
+                LOCATE_DISPLAY_SERVER_REQ,
+                DISPLAY_SERVER_AVAIL_REPLY,
+                4);
+    }
 
+    private void run() {
+        locator.start();
         try {
             RadiogramConnection rxConn = (RadiogramConnection) Connector.open("radiogram://:" + RX_NODE_PORT);
             Datagram rxDatagram = rxConn.newDatagram(rxConn.getMaximumLength());
@@ -58,22 +72,27 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
                 }
 
                 //check if it's time to send a heartbeat
-                if (isReadyToSendHeartbeat()) {
-                    System.out.println("Ready to send heartbeat");
-                    String frame = getHeartbeatFrame();
-                    sendToServer(frame);
-                    lastHeartbeatTimestamp = System.currentTimeMillis();
-                }
+//                if (isReadyToSendHeartbeat()) {
+//                    System.out.println("Ready to send heartbeat");
+//                    String frame = getHeartbeatFrame();
+//                    sendToServer(frame);
+//                    lastHeartbeatTimestamp = System.currentTimeMillis();
+//                }
             }
 
         } catch (IOException e) {
             System.out.println("Error opening connection: " + e);
         }
     }
-    
+
+    protected void startApp() throws MIDletStateChangeException {
+        initialize();
+        run();
+    }
+
     private boolean isReadyToSendHeartbeat() {
         long diff = System.currentTimeMillis() - lastHeartbeatTimestamp;
-        boolean timerReady =  diff > heartbeatInterval;
+        boolean timerReady = diff > heartbeatInterval;
         boolean heartbeatSendStatus = true;
         for (int i = 0; i < nodeCount; i++) {
             heartbeatSendStatus = heartbeatSendStatus && nodeList[i].isLastHeartbeatSendStatus();
@@ -86,38 +105,18 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
             if (diff > 1.2 * heartbeatInterval) {
                 return true;
             }
-        } 
+        }
         return false;
     }
 
     private String getHeartbeatFrame() {
         StringBuffer sb = new StringBuffer("HEARTBEAT." + MY_MAC + ",");
         for (int i = 0; i < nodeCount; i++) {
-            sb.append(nodeList[i].getMAC())
-              .append(",")
-              .append(nodeList[i].getLightValue())
-              .append(",")
-              .append(nodeList[i].getTempValue())
-              .append(",")
-              .append(nodeList[i].getAccelXValue())
-              .append(",")
-              .append(nodeList[i].getAccelYValue())
-              .append(",")
-              .append(nodeList[i].getAccelZValue());
+            sb.append(nodeList[i].getMAC()).append(",").append(nodeList[i].getLightValue()).append(",").append(nodeList[i].getTempValue()).append(",").append(nodeList[i].getAccelXValue()).append(",").append(nodeList[i].getAccelYValue()).append(",").append(nodeList[i].getAccelZValue());
             nodeList[i].setLastHeartbeatSendStatus(true);
         }
         try {
-         sb.append(MY_MAC)
-           .append(",")
-           .append(light.getValue())
-           .append(",")
-           .append(temp.getCelsius())
-           .append(",")
-           .append(accel.getAccelX())
-           .append(",")
-           .append(accel.getAccelY())
-           .append(",")
-           .append(accel.getAccelZ());
+            sb.append(MY_MAC).append(",").append(light.getValue()).append(",").append(temp.getCelsius()).append(",").append(accel.getAccelX()).append(",").append(accel.getAccelY()).append(",").append(accel.getAccelZ());
         } catch (Exception e) {
             System.out.println("Error getting light Value, temp Value, accel Value: " + e);
         }
@@ -162,11 +161,11 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
         return n;
     }
 
-    private String[] parseCSV (String line) {
+    private String[] parseCSV(String line) {
         int elements = 0;
         String[] fields = new String[10];
         String s = line;
-        while(s.length() > 0) {
+        while (s.length() > 0) {
             int nextCommaIndex = s.indexOf(",");
             if (nextCommaIndex == -1) {
                 fields[elements] = s;
@@ -178,11 +177,11 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
         }
         return fields;
     }
-    
+
     protected void pauseApp() {
         // This will never be called by the Squawk VM
     }
-    
+
     protected void destroyApp(boolean arg0) throws MIDletStateChangeException {
         // Only called if startApp throws any exception other than MIDletStateChangeException
     }
@@ -194,5 +193,62 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
     }
 
     public void conditionMet(SensorEvent evt, Condition condition) {
+    }
+
+    public void serviceLocated(long serverAddress) {
+        try {
+            if (hostConn != null) {
+                hostConn.close();
+            }
+            hostConn = (RadiogramConnection) Connector.open("radiogram://"
+                    + IEEEAddress.toDottedHex(serverAddress) + ":" + CONNECTED_PORT);
+            hostConn.setTimeout(-1);    // no timeout
+        } catch (IOException ex) {
+            System.out.println("Failed to open connection to host: " + ex);
+            closeConnection();
+            return;
+        }
+        connected = true;
+
+        xmit = new PacketTransmitter(hostConn);     // set up thread to transmit replies to host
+        xmit.setServiceName("Telemetry Xmitter");
+        xmit.start();
+
+        rcvr = new PacketReceiver(hostConn);        // set up thread to receive & dispatch commands
+        rcvr.setServiceName("Telemetry Command Server");
+
+        rcvr.registerHandler(this, BLINK_LEDS_REQ);
+        rcvr.start();
+    }
+
+    public void handlePacket(byte type, Radiogram pkt) {
+        try {
+            switch (type) {
+                case BLINK_LEDS_REQ:
+                    System.out.println("Blink!");
+            }
+        }
+        catch (Exception ex) {
+            closeConnection();
+        }
+    }
+
+    public void closeConnection() {
+        if (!connected) {
+            return;
+        }
+        connected = false;
+        xmit.stop();
+        rcvr.stop();
+        Utils.sleep(100);       // give things time to shut down
+        try {
+            if (hostConn != null) {
+                hostConn.close();
+                hostConn = null;
+            }
+        } catch (IOException ex) {
+            System.out.println("Failed to close connection to host: " + ex);
+        }
+        locator.start();
     }
 }
