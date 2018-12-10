@@ -225,7 +225,7 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
         try {
             switch (type) {
                 case BLINK_LEDS_REQ:
-                    System.out.println("Blink!");
+                    System.out.println("Blink: " + pkt.readUTF());
             }
         }
         catch (Exception ex) {

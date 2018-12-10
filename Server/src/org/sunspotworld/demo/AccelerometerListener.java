@@ -164,7 +164,7 @@ public class AccelerometerListener extends Thread implements PacketTypes {
     /**
      * Send a request to the remote SPOT to blink its LEDs.
      */
-    public void doBlink() {
+    public void doBlink(byte MAC) {
         sendCmd(BLINK_LEDS_REQ);
     }
 
@@ -202,6 +202,21 @@ public class AccelerometerListener extends Thread implements PacketTypes {
             try {
                 xdg.reset();
                 xdg.writeByte(cmd);
+                conn.send(xdg);
+            } catch (NoAckException nex) {
+                updateConnectionStatus(false);
+            } catch (IOException ex) {
+                // ignore any other problems
+            }
+        }
+    }
+
+    private void sendCmdString(byte cmd, byte text) {
+                if (conn != null) {
+            try {
+                xdg.reset();
+                xdg.writeByte(cmd);
+                xdg.writeByte(text);
                 conn.send(xdg);
             } catch (NoAckException nex) {
                 updateConnectionStatus(false);
