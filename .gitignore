@@ -1,0 +1,10 @@
+/AddNode/build/*
+/AddNode/j2meclasses/*
+/Node/build/*
+/Node/j2meclasses/*
+/Server/build/*
+/Server/j2meclasses/*
+/Sink/build/*
+/Sink/j2meclasses/*
+*.jar
+
