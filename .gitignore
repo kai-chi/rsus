@@ -1,5 +1,5 @@
-/AddNode/build/*
-/AddNode/j2meclasses/*
+AddNode/build/
+AddNode/j2meclasses/
 /Node/build/*
 /Node/j2meclasses/*
 /Server/build/*
@@ -7,4 +7,4 @@
 /Sink/build/*
 /Sink/j2meclasses/*
 *.jar
-
+*.class
