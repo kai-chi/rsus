@@ -72,12 +72,24 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
                 }
 
                 //check if it's time to send a heartbeat
-//                if (isReadyToSendHeartbeat()) {
-//                    System.out.println("Ready to send heartbeat");
-//                    String frame = getHeartbeatFrame();
-//                    sendToServer(frame);
-//                    lastHeartbeatTimestamp = System.currentTimeMillis();
-//                }
+                if (isReadyToSendHeartbeat()) {
+                    System.out.println("Ready to send heartbeat");
+                   String frame = getHeartbeatFrame();
+                   sendToServer(frame);
+                    lastHeartbeatTimestamp = System.currentTimeMillis();
+              }
+                if (isReadyToSendHeartbeat()) {
+                    System.out.println("Ready to send Alarm");
+                    String frame = getAlarmTempFrame();
+                    sendToServer(frame);
+                    lastHeartbeatTimestamp = System.currentTimeMillis();
+                }
+                if (isReadyToSendHeartbeat()) {
+                    System.out.println("Ready to send Alarm");
+                    String frame = getAlarmAccelFrame();
+                    sendToServer(frame);
+                    lastHeartbeatTimestamp = System.currentTimeMillis();
+                }
             }
 
         } catch (IOException e) {
@@ -133,6 +145,49 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
         }
     }
 
+    private String getAlarmTempFrame() {
+        StringBuffer sb = new StringBuffer("ALARMTEMP." + MY_MAC + ",");
+        for (int i = 0; i < nodeCount; i++) {
+            sb.append(nodeList[i].getMAC())
+              .append(",")
+              .append(nodeList[i].getTempValue());
+            nodeList[i].setLastHeartbeatSendStatus(true);
+        }
+        try {
+         sb.append(MY_MAC)
+           .append(",")
+           .append(temp.getCelsius());
+        } catch (Exception e) {
+            System.out.println("Error getting Alarm Value, temp Value: " + e);
+        }
+        return sb.toString();
+    }
+        private String getAlarmAccelFrame() {
+        StringBuffer sb = new StringBuffer("ALARMACCEL." + MY_MAC + ",");
+        for (int i = 0; i < nodeCount; i++) {
+            sb.append(nodeList[i].getMAC())
+              .append(",")
+              .append(nodeList[i].getAccelXValue())
+              .append(",")
+              .append(nodeList[i].getAccelYValue())
+              .append(",")
+              .append(nodeList[i].getAccelZValue());
+            nodeList[i].setLastHeartbeatSendStatus(true);
+        }
+        try {
+         sb.append(MY_MAC)
+           .append(",")
+           .append(accel.getAccelX())
+           .append(",")
+           .append(accel.getAccelY())
+           .append(",")
+           .append(accel.getAccelZ());
+        } catch (Exception e) {
+            System.out.println("Error getting Alarm Value accel Value: " + e);
+        }
+        return sb.toString();
+    }
+
     private void parseRxData(String data) {
         String[] fields = parseCSV(data);
         if (fields.length < 6) {
@@ -145,6 +200,18 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
             n.setAccelXValue(Integer.parseInt(fields[4]));
             n.setAccelYValue(Integer.parseInt(fields[5]));
             n.setAccelZValue(Integer.parseInt(fields[6]));
+            n.setLastHeartbeat(System.currentTimeMillis());
+        }
+         if (fields[0].equals("ALARMTEMP")) {
+            Node n = getNodeByMAC(fields[1]);
+            n.setTempValue(Integer.parseInt(fields[2]));
+            n.setLastHeartbeat(System.currentTimeMillis());
+        }
+         if (fields[0].equals("ALARMACCEL")) {
+            Node n = getNodeByMAC(fields[1]);
+            n.setAccelXValue(Integer.parseInt(fields[2]));
+            n.setAccelYValue(Integer.parseInt(fields[3]));
+            n.setAccelZValue(Integer.parseInt(fields[4]));
             n.setLastHeartbeat(System.currentTimeMillis());
         }
     }

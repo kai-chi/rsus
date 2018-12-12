@@ -30,6 +30,8 @@ public class NodeMain extends MIDlet implements IADT7411ThresholdListener {
     private final String MY_MAC = SpotCommons.getMyMAC(Spot.getInstance());
 
    protected void startApp() throws MIDletStateChangeException {
+             int Alarm_Temp = 25;  // Add pour Comparaison
+        int Alarm_Accel = 2; // Add pour Comparaison
         int lightValue = 0;
         int tempValue = 0;
         int accelXValue = 0;
@@ -44,7 +46,43 @@ public class NodeMain extends MIDlet implements IADT7411ThresholdListener {
                accelXValue = (int) accel.getAccelX();
                accelYValue = (int) accel.getAccelY();
                accelZValue = (int) accel.getAccelZ();
+          
                try {
+                   dg.reset();
+               if((accelXValue >= Alarm_Accel) || (accelYValue >= Alarm_Accel) || (accelZValue >= Alarm_Accel))
+               {
+                 try {
+                   dg.reset();
+                   dg.writeUTF("ALARMACCEL,"
+                           + MY_MAC
+                           + ","
+                           + accelXValue
+                           + ","
+                           + accelYValue
+                           + ","
+                           + accelZValue);
+                   tx.send(dg);
+                System.out.println("Sent ALARM ACCEL Data: " + accelXValue + accelYValue + accelZValue);
+               }
+               catch (IOException ex) {
+                   System.out.println("Error receiving packet: " + ex);
+               }
+               }
+               if((tempValue >= Alarm_Temp))
+               {
+                 try {
+                   dg.reset();
+                   dg.writeUTF("ALARMTEMP,"
+                           + MY_MAC
+                           + ","
+                           + tempValue);
+                   tx.send(dg);
+                System.out.println("Sent ALARM TEMP Data: " + tempValue);
+               }
+               catch (IOException ex) {
+                   System.out.println("Error receiving packet: " + ex);
+               }
+               }
                    dg.reset();
                    dg.writeUTF("HEARTBEAT,"
                            + MY_MAC
@@ -61,13 +99,14 @@ public class NodeMain extends MIDlet implements IADT7411ThresholdListener {
                    tx.send(dg);
                 System.out.println("Sent data: " + lightValue + tempValue + accelXValue + accelYValue + accelZValue);
                }
-               catch (IOException ex) {
+              /* catch (IOException ex) {
                    System.out.println("Error receiving packet: " + ex);
                }
+              */
                finally {
                    tx.close();
                }
-               Utils.sleep(10000);
+               Utils.sleep(5000);
            }
         }
         catch (Exception e) {
