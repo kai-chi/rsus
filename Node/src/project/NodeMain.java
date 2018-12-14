@@ -16,9 +16,13 @@ import javax.microedition.midlet.MIDlet;
 import javax.microedition.midlet.MIDletStateChangeException;
 import com.sun.spot.peripheral.Spot;
 import com.sun.spot.util.Utils;
-import project.SpotCommons;
 
 public class NodeMain extends MIDlet implements IADT7411ThresholdListener {
+
+    private final int TEMP_ALARM_THRESHOLD = 25;
+    private final int ACC_ALARM_THRESHOLD = 2;
+    private final long HEARTBEAT_FREQ = 10000;
+    private final long ALARM_FREQ = 5000;
 
     private ILightSensor light = (ILightSensor) Resources.lookup(ILightSensor.class);
     private ITemperatureInput temp = (ITemperatureInput) Resources.lookup(ITemperatureInput.class);
@@ -27,84 +31,92 @@ public class NodeMain extends MIDlet implements IADT7411ThresholdListener {
     private Datagram dg;
     private final String MY_MAC = SpotCommons.getMyMAC(Spot.getInstance());
 
+    private long lastSentHeartbeat = 0;
+    private long lastSentTempAlarm = 0;
+    private long lastSentAccAlarm = 0;
+
+    int tempValue = 0;
+    int accelXValue = 0;
+    int accelYValue = 0;
+    int accelZValue = 0;
+
     protected void startApp() throws MIDletStateChangeException {
-        int Alarm_Temp = 25;  // Add pour Comparaison
-        int Alarm_Accel = 2; // Add pour Comparaison
-        int lightValue = 0;
-        int tempValue = 0;
-        int accelXValue = 0;
-        int accelYValue = 0;
-        int accelZValue = 0;
         try {
             while (true) {
-                tx = (RadiogramConnection) Connector.open("radiogram://7f00.0101.0000.1002:112");
-                dg = (Datagram) tx.newDatagram(tx.getMaximumLength());
-                lightValue = light.getValue();
-                tempValue = (int) temp.getCelsius();
-                accelXValue = (int) accel.getAccelX();
-                accelYValue = (int) accel.getAccelY();
-                accelZValue = (int) accel.getAccelZ();
-
-                try {
-                    dg.reset();
-                    if ((accelXValue >= Alarm_Accel) || (accelYValue >= Alarm_Accel) || (accelZValue >= Alarm_Accel)) {
-                        try {
-                            dg.reset();
-                            dg.writeUTF("ALARMACCEL,"
-                                    + MY_MAC
-                                    + ","
-                                    + accelXValue
-                                    + ","
-                                    + accelYValue
-                                    + ","
-                                    + accelZValue);
-                            tx.send(dg);
-                            System.out.println("Sent ALARMACCEL");
-                        } catch (IOException ex) {
-                            System.out.println("Error receiving packet: " + ex);
-                        }
-                    }
-                    if ((tempValue >= Alarm_Temp)) {
-                        try {
-                            dg.reset();
-                            dg.writeUTF("ALARMTEMP,"
-                                    + MY_MAC
-                                    + ","
-                                    + tempValue);
-                            tx.send(dg);
-                            System.out.println("Sent ALARMTEMP");
-                        } catch (IOException ex) {
-                            System.out.println("Error receiving packet: " + ex);
-                        }
-                    }
-                    dg.reset();
-                    StringBuffer sb = new StringBuffer("HEARTBEAT,");
-                    String frame = sb.append(MY_MAC)
-                            .append(",")
-                            .append(lightValue)
-                            .append(",")
-                            .append(tempValue)
-                            .append(",")
-                            .append(accelXValue)
-                            .append(",")
-                            .append(accelYValue)
-                            .append(",")
-                            .append(accelZValue)
-                            .toString();
-                    dg.writeUTF(frame);
-                    tx.send(dg);
-                    System.out.println("Sent data: " + frame);
-                } /* catch (IOException ex) {
-                System.out.println("Error receiving packet: " + ex);
-                }
-                 */ finally {
-                    tx.close();
-                }
-                Utils.sleep(5000);
+                readSensorValues();
+                checkAccAlarm();
+                checkTempAlarm();
+                sendHeartbeat();
+                
+                Utils.sleep(200);
             }
         } catch (Exception e) {
-            System.out.println("Error opening connection: " + e);
+            System.out.println("Connection error: " + e);
         }
+    }
+
+    private void sendHeartbeat() throws IOException {
+        if (lastSentHeartbeat < System.currentTimeMillis() - HEARTBEAT_FREQ) {
+            StringBuffer sb = new StringBuffer("HEARTBEAT,");
+            String frame = sb.append(MY_MAC)
+                    .append(",")
+                    .append(light.getValue())
+                    .append(",")
+                    .append(tempValue)
+                    .append(",")
+                    .append(accelXValue)
+                    .append(",")
+                    .append(accelYValue)
+                    .append(",")
+                    .append(accelZValue)
+                    .toString();
+            sendFrameToAggNode(frame);
+            lastSentHeartbeat = System.currentTimeMillis();
+        }
+    }
+    
+    private void checkAccAlarm() throws IOException {
+        if (lastSentAccAlarm < System.currentTimeMillis() - ALARM_FREQ
+                && ((accelXValue >= ACC_ALARM_THRESHOLD)
+                || (accelYValue >= ACC_ALARM_THRESHOLD)
+                || (accelZValue >= ACC_ALARM_THRESHOLD))) {
+            String frame = "ALARMACCEL," + MY_MAC;
+            sendFrameToAggNode(frame);
+            lastSentAccAlarm = System.currentTimeMillis();
+        }
+    }
+    
+    private void checkTempAlarm() throws IOException {
+        if (lastSentTempAlarm < System.currentTimeMillis() - ALARM_FREQ
+                && (tempValue >= TEMP_ALARM_THRESHOLD)) {
+            String frame = "ALARMTEMP," + MY_MAC;
+            sendFrameToAggNode(frame);
+            lastSentTempAlarm = System.currentTimeMillis();
+        }
+    }
+
+    private void readSensorValues() throws IOException{
+        tempValue = (int) temp.getCelsius();
+        accelXValue = (int) accel.getAccelX();
+        accelYValue = (int) accel.getAccelY();
+        accelZValue = (int) accel.getAccelZ();
+    }
+
+    private void sendFrameToAggNode(String frame) throws IOException {
+        try {
+            tx = (RadiogramConnection) Connector.open("radiogram://7f00.0101.0000.1002:112");
+            dg = (Datagram) tx.newDatagram(tx.getMaximumLength());
+
+            dg.reset();
+            dg.writeUTF(frame);
+            tx.send(dg);
+            System.out.println("Sent to AggNode: " + frame);
+        } catch (IOException e) {
+            System.out.println("Error sending frame to AggNode");
+        } finally {
+            tx.close();
+        }
+
     }
 
     protected void pauseApp() {

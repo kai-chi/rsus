@@ -92,7 +92,6 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
 
     private void checkForSendingHeartbeat() throws IOException {
         if (isReadyToSendHeartbeat()) {
-            System.out.println("Ready to send heartbeat");
             String frame = getHeartbeatFrame();
             sendToServer(frame);
             lastHeartbeatTimestamp = System.currentTimeMillis();
@@ -183,6 +182,7 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
     }
 
     private void sendToServer(String frame) {
+        System.out.println("Send to server: " + frame);
         try {
             txServerDatagram.writeUTF(frame);
             txServerConn.send(txServerDatagram);
@@ -206,13 +206,14 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
             n.setAccelZValue(Integer.parseInt(fields[6]));
             n.setLastHeartbeat(System.currentTimeMillis());
         }
-        if (fields[0].equals("ALARMTEMP")) {
-            Node n = getNodeByMAC(fields[1]);
-            n.setTempAlarmRaised(true);
-        }
-        if (fields[0].equals("ALARMACCEL")) {
-            Node n = getNodeByMAC(fields[1]);
-            n.setAccAlarmRaised(true);
+        else if(fields[0].equals("ALARMTEMP")
+                || fields[0].equals("ALARMACC")) {
+            StringBuffer sb = new StringBuffer(fields[0])
+                    .append(",")
+                    .append(MY_MAC)
+                    .append(",")
+                    .append(fields[1]);
+            sendToServer(sb.toString());
         }
     }
 
