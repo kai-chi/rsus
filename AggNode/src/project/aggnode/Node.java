@@ -18,6 +18,10 @@ public class Node {
     private int accelYValue;
     private int accelZValue;
     private long lastHeartbeat;
+    private boolean tempAlarmRaised;
+    private long lastTempAlarm;
+    private boolean accAlarmRaised;
+    private long lastAccAlarm;
     private boolean lastHeartbeatSendStatus = false;
 
     public Node(String MAC, int lightValue, int tempValue, int accelXValue, int accelYValue, int accelZValue) {
@@ -32,6 +36,38 @@ public class Node {
 
     public Node(String MAC) {
         this.MAC = MAC;
+    }
+
+    public boolean isAccAlarmRaised() {
+        return accAlarmRaised;
+    }
+
+    public void setAccAlarmRaised(boolean accAlarmRaised) {
+        this.accAlarmRaised = accAlarmRaised;
+    }
+
+    public boolean isTempAlarmRaised() {
+        return tempAlarmRaised;
+    }
+
+    public void setTempAlarmRaised(boolean tempAlarmRaised) {
+        this.tempAlarmRaised = tempAlarmRaised;
+    }
+
+    public long getLastAccAlarm() {
+        return lastAccAlarm;
+    }
+
+    public void setLastAccAlarm(long lastAccAlarm) {
+        this.lastAccAlarm = lastAccAlarm;
+    }
+
+    public long getLastTempAlarm() {
+        return lastTempAlarm;
+    }
+
+    public void setLastTempAlarm(long lastTempAlarm) {
+        this.lastTempAlarm = lastTempAlarm;
     }
 
     public String getMAC() {
