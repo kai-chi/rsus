@@ -15,6 +15,8 @@ import javax.microedition.io.Datagram;
 import javax.microedition.midlet.MIDlet;
 import javax.microedition.midlet.MIDletStateChangeException;
 import com.sun.spot.peripheral.Spot;
+import com.sun.spot.resources.transducers.ITriColorLEDArray;
+import com.sun.spot.resources.transducers.LEDColor;
 import com.sun.spot.util.Utils;
 
 public class NodeMain extends MIDlet implements IADT7411ThresholdListener {
@@ -23,26 +25,33 @@ public class NodeMain extends MIDlet implements IADT7411ThresholdListener {
     private final int ACC_ALARM_THRESHOLD = 2;
     private final long HEARTBEAT_FREQ = 10000;
     private final long ALARM_FREQ = 5000;
+    private final String MY_MAC = SpotCommons.getMyMAC(Spot.getInstance());
+    private final int RX_PORT = 46;
 
     private ILightSensor light = (ILightSensor) Resources.lookup(ILightSensor.class);
     private ITemperatureInput temp = (ITemperatureInput) Resources.lookup(ITemperatureInput.class);
     private IAccelerometer3D accel = (IAccelerometer3D) Resources.lookup(IAccelerometer3D.class);
+    private ITriColorLEDArray leds = (ITriColorLEDArray) Resources.lookup(ITriColorLEDArray.class);
+
     private RadiogramConnection tx = null;
-    private Datagram dg;
-    private final String MY_MAC = SpotCommons.getMyMAC(Spot.getInstance());
+    private Datagram txDatagram;
+    private RadiogramConnection rxConn = null;
+    private Datagram rxDatagram;
 
     private long lastSentHeartbeat = 0;
     private long lastSentTempAlarm = 0;
     private long lastSentAccAlarm = 0;
 
-    int tempValue = 0;
-    int accelXValue = 0;
-    int accelYValue = 0;
-    int accelZValue = 0;
+    private int tempValue = 0;
+    private int accelXValue = 0;
+    private int accelYValue = 0;
+    private int accelZValue = 0;
 
     protected void startApp() throws MIDletStateChangeException {
         try {
+            openRxConnection();
             while (true) {
+                checkForRxData();
                 readSensorValues();
                 checkAccAlarm();
                 checkTempAlarm();
@@ -53,6 +62,47 @@ public class NodeMain extends MIDlet implements IADT7411ThresholdListener {
         } catch (Exception e) {
             System.out.println("Connection error: " + e);
         }
+    }
+    
+    private void checkForRxData() throws IOException {
+        if (rxConn.packetsAvailable()) {
+            rxConn.receive(rxDatagram);
+            String rxData = rxDatagram.readUTF();
+            System.out.println("Received data: " + rxData);
+            parseRxData(rxData);
+        }
+    }
+    
+    private void parseRxData(String data) {
+        String[] fields = parseCSV(data);
+        if (fields.length == 0) {
+            return;
+        }
+        if (fields[0].equals("BLINK")) {
+            blinkLEDs(Integer.parseInt(fields[1]));
+        }
+    }
+    
+    private String[] parseCSV(String line) {
+        int elements = 0;
+        String[] fields = new String[10];
+        String s = line;
+        while (s.length() > 0) {
+            int nextCommaIndex = s.indexOf(",");
+            if (nextCommaIndex == -1) {
+                fields[elements] = s;
+                break;
+            }
+            String field = s.substring(0, nextCommaIndex);
+            fields[elements++] = field;
+            s = s.substring(nextCommaIndex + 1);
+        }
+        return fields;
+    }
+
+    private void openRxConnection() throws IOException {
+        rxConn = (RadiogramConnection) Connector.open("radiogram://:" + RX_PORT);
+        rxDatagram = rxConn.newDatagram(rxConn.getMaximumLength());
     }
 
     private void sendHeartbeat() throws IOException {
@@ -80,7 +130,7 @@ public class NodeMain extends MIDlet implements IADT7411ThresholdListener {
                 && ((accelXValue >= ACC_ALARM_THRESHOLD)
                 || (accelYValue >= ACC_ALARM_THRESHOLD)
                 || (accelZValue >= ACC_ALARM_THRESHOLD))) {
-            String frame = "ALARMACCEL," + MY_MAC;
+            String frame = "ALARMACC," + MY_MAC;
             sendFrameToAggNode(frame);
             lastSentAccAlarm = System.currentTimeMillis();
         }
@@ -105,11 +155,11 @@ public class NodeMain extends MIDlet implements IADT7411ThresholdListener {
     private void sendFrameToAggNode(String frame) throws IOException {
         try {
             tx = (RadiogramConnection) Connector.open("radiogram://7f00.0101.0000.1002:112");
-            dg = (Datagram) tx.newDatagram(tx.getMaximumLength());
+            txDatagram = (Datagram) tx.newDatagram(tx.getMaximumLength());
 
-            dg.reset();
-            dg.writeUTF(frame);
-            tx.send(dg);
+            txDatagram.reset();
+            txDatagram.writeUTF(frame);
+            tx.send(txDatagram);
             System.out.println("Sent to AggNode: " + frame);
         } catch (IOException e) {
             System.out.println("Error sending frame to AggNode");
@@ -131,5 +181,26 @@ public class NodeMain extends MIDlet implements IADT7411ThresholdListener {
     }
 
     public void thresholdExceeded(ADT7411Event evt) {
+    }
+
+    private void blinkLEDs(int color) {
+        for (int i = 0; i < 3; i++) {
+            switch (color) {
+                case 0: // registration successful
+                    leds.setColor(LEDColor.GREEN);
+                    break;
+                case 1: // alarm
+                    leds.setColor(LEDColor.RED);
+                    break;
+                case 2: // ping
+                    leds.setColor(LEDColor.WHITE);
+                default:
+                    return;
+            }
+            leds.setOn();
+            Utils.sleep(300);
+            leds.setOff();
+            Utils.sleep(200);
+        }
     }
 }

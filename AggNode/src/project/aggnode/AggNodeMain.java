@@ -33,6 +33,11 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
     private final int SERVER_TX_PORT = 111;
     private final String MY_MAC = SpotCommons.getMyMAC(Spot.getInstance());
     private final long ALARM_FREQUENCY = 10000;
+    private final int NODE_TX_PORT = 46;
+    private final int TEMP_ALARM_THRESHOLD = 25;
+    private final int ACC_ALARM_THRESHOLD = 2;
+    private final long ALARM_FREQ = 5000;
+
     private RadiogramConnection txServerConn = null;
     private Datagram txServerDatagram;
     private long heartbeatInterval = 10 * 1000; // interval in milliseconds
@@ -47,6 +52,13 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
     private PacketReceiver rcvr;
     private PacketTransmitter xmit;
     private boolean connected = false;
+    private long lastSentTempAlarm = 0;
+    private long lastSentAccAlarm = 0;
+
+    private int tempValue = 0;
+    private int accelXValue = 0;
+    private int accelYValue = 0;
+    private int accelZValue = 0;
 
 
     private void initialize() {
@@ -66,6 +78,7 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
 
             while (true) {
                 parseIncomingData(rxConn, rxDatagram);
+                readSensorValues();
                 checkForTempAlarms();
                 checkForAccAlarms();
                 checkForSendingHeartbeat();
@@ -113,6 +126,7 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
                 n.setLastTempAlarm(System.currentTimeMillis());
             }
         }
+        checkMyTempAlarm();
     }
 
     private void checkForAccAlarms() {
@@ -130,6 +144,34 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
                 n.setLastAccAlarm(System.currentTimeMillis());
             }
         }
+        checkMyAccAlarm();
+    }
+
+    private void checkMyAccAlarm() {
+        if (lastSentAccAlarm < System.currentTimeMillis() - ALARM_FREQ
+                && ((accelXValue >= ACC_ALARM_THRESHOLD)
+                || (accelYValue >= ACC_ALARM_THRESHOLD)
+                || (accelZValue >= ACC_ALARM_THRESHOLD))) {
+            String frame = "ALARMACC," + MY_MAC + "," + MY_MAC;
+            sendToServer(frame);
+            lastSentAccAlarm = System.currentTimeMillis();
+        }
+    }
+
+    private void checkMyTempAlarm() {
+        if (lastSentTempAlarm < System.currentTimeMillis() - ALARM_FREQ
+                && (tempValue >= TEMP_ALARM_THRESHOLD)) {
+            String frame = "ALARMTEMP," + MY_MAC + "," + MY_MAC;
+            sendToServer(frame);
+            lastSentTempAlarm = System.currentTimeMillis();
+        }
+    }
+
+    private void readSensorValues() throws IOException {
+        tempValue = (int) temp.getCelsius();
+        accelXValue = (int) accel.getAccelX();
+        accelYValue = (int) accel.getAccelY();
+        accelZValue = (int) accel.getAccelZ();
     }
 
     private boolean isReadyToSendHeartbeat() {
@@ -192,9 +234,34 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
         }
     }
 
+    private void sendToNode(String mac, String frame) {
+        RadiogramConnection tx = null;
+        Datagram txDatagram;
+        System.out.println("Sent to " + mac + " : " + frame);
+        try {
+            try {
+                tx = (RadiogramConnection) Connector.open("radiogram://" + mac + ":" + NODE_TX_PORT);
+                txDatagram = (Datagram) tx.newDatagram(tx.getMaximumLength());
+
+                txDatagram.reset();
+                txDatagram.writeUTF(frame);
+                tx.send(txDatagram);
+
+            } catch (IOException e) {
+                System.out.println("Error sending frame to Node");
+            } finally {
+                tx.close();
+            }
+        }
+        catch (IOException e) {
+            System.out.println("Error sending to Node " + e);
+        }
+
+    }
+
     private void parseRxData(String data) {
         String[] fields = parseCSV(data);
-        if (fields.length < 6) {
+        if (fields.length < 3) {
             return;
         }
         if (fields[0].equals("HEARTBEAT")) {
@@ -214,18 +281,20 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
                     .append(",")
                     .append(fields[1]);
             sendToServer(sb.toString());
+            sendToNode(fields[1], "BLINK,1");
         }
     }
 
-    private Node getNodeByMAC(String MAC) {
+    private Node getNodeByMAC(String mac) {
         for (int i = 0; i < nodeCount; i++) {
-            if (nodeList[i].getMAC().equals(MAC)) {
+            if (nodeList[i].getMAC().equals(mac)) {
                 return nodeList[i];
             }
         }
-        Node n = new Node(MAC);
+        Node n = new Node(mac);
         nodeList[nodeCount++] = n;
         System.out.println("Registerd a new Node");
+        sendToNode(mac, "BLINK,0");
         return n;
     }
 
