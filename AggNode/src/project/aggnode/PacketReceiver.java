@@ -116,8 +116,6 @@ public class PacketReceiver extends Resource implements IService {
                 try {
                     rcvConn.receive(rdg);
                     byte packetType = rdg.readByte();
-                    System.out.println("Read byte: " + packetType);
-                    System.out.println("Read new byte: " + packetType);
                     synchronized (this) { // we don't allow new handlers to be added in this section
                         Vector handlers = registeredHandlers[packetType];
                         if (handlers.size() == 0) {

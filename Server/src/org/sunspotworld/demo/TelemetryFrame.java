@@ -162,8 +162,6 @@ public class TelemetryFrame extends JFrame implements Printable {
      */
     private void setGraphView(GraphView gv) {
         graphView = gv;
-        Integer fieldWidth = (Integer)nodeNumberField.getValue();
-        graphView.setFilterWidth(fieldWidth.intValue() - 1);
         final GraphView gview = gv;
         axisView = new JPanel(){
             public Dimension getPreferredSize() {
@@ -332,7 +330,7 @@ public class TelemetryFrame extends JFrame implements Printable {
         jPanel3 = new javax.swing.JPanel();
         buttonPanel = new javax.swing.JPanel();
         jLabel4 = new javax.swing.JLabel();
-        nodeNumberField = new javax.swing.JFormattedTextField();
+        jComboBox1 = new javax.swing.JComboBox();
         jLabel5 = new javax.swing.JLabel();
         nodeNumberField1 = new javax.swing.JFormattedTextField();
         jLabel6 = new javax.swing.JLabel();
@@ -358,7 +356,7 @@ public class TelemetryFrame extends JFrame implements Printable {
 
         jPanel1.setMaximumSize(new java.awt.Dimension(25000, 25000));
         jPanel1.setPreferredSize(new java.awt.Dimension(480, 480));
-        jPanel1.setLayout(new java.awt.GridLayout());
+        jPanel1.setLayout(new java.awt.GridLayout(1, 0));
         getContentPane().add(jPanel1, java.awt.BorderLayout.LINE_START);
 
         jPanel3.setAlignmentX(0.0F);
@@ -379,29 +377,14 @@ public class TelemetryFrame extends JFrame implements Printable {
         jLabel4.setText("Node no:");
         buttonPanel.add(jLabel4);
 
-        nodeNumberField.setColumns(2);
-        nodeNumberField.setText("1");
-        nodeNumberField.setAlignmentY(1.0F);
-        nodeNumberField.setMaximumSize(new java.awt.Dimension(32, 22));
-        nodeNumberField.setMinimumSize(new java.awt.Dimension(32, 22));
-        nodeNumberField.setValue(new Integer(5));
-        nodeNumberField.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                nodeNumberFieldActionPerformed(evt);
-            }
-        });
-        nodeNumberField.addPropertyChangeListener(new java.beans.PropertyChangeListener() {
-            public void propertyChange(java.beans.PropertyChangeEvent evt) {
-                nodeNumberFieldPropertyChange(evt);
-            }
-        });
-        buttonPanel.add(nodeNumberField);
+        jComboBox1.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "1", "2", "3", "4" }));
+        jComboBox1.setName("nodeComboBox"); // NOI18N
+        buttonPanel.add(jComboBox1);
 
         jLabel5.setText("   Set interval:");
         buttonPanel.add(jLabel5);
 
         nodeNumberField1.setColumns(2);
-        nodeNumberField1.setText("1");
         nodeNumberField1.setAlignmentY(1.0F);
         nodeNumberField1.setMaximumSize(new java.awt.Dimension(32, 22));
         nodeNumberField1.setMinimumSize(new java.awt.Dimension(32, 22));
@@ -421,7 +404,7 @@ public class TelemetryFrame extends JFrame implements Printable {
         jLabel6.setText("   ");
         buttonPanel.add(jLabel6);
 
-        blinkButton.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        blinkButton.setFont(new java.awt.Font("Lucida Grande", 0, 12));
         blinkButton.setText("Blink LEDs");
         blinkButton.setMinimumSize(new java.awt.Dimension(90, 29));
         blinkButton.setPreferredSize(new java.awt.Dimension(94, 29));
@@ -433,7 +416,7 @@ public class TelemetryFrame extends JFrame implements Printable {
         buttonPanel.add(blinkButton);
 
         blinkButton1.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        blinkButton1.setText("Set Interval");
+        blinkButton1.setText("TODO");
         blinkButton1.setMinimumSize(new java.awt.Dimension(90, 29));
         blinkButton1.setPreferredSize(new java.awt.Dimension(94, 29));
         blinkButton1.addActionListener(new java.awt.event.ActionListener() {
@@ -491,7 +474,7 @@ public class TelemetryFrame extends JFrame implements Printable {
     }// </editor-fold>//GEN-END:initComponents
 
     private void blinkButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_blinkButtonActionPerformed
-        listener.doBlink(Byte.valueOf(nodeNumberField.getText()));
+        listener.doBlink(Integer.valueOf(jComboBox1.getSelectedIndex() + 1));
     }//GEN-LAST:event_blinkButtonActionPerformed
 
     private void aboutMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_aboutMenuItemActionPerformed
@@ -501,21 +484,6 @@ public class TelemetryFrame extends JFrame implements Printable {
                 JOptionPane.INFORMATION_MESSAGE,
                 SpotListener.aboutIcon);
     }//GEN-LAST:event_aboutMenuItemActionPerformed
-
-    private void nodeNumberFieldPropertyChange(java.beans.PropertyChangeEvent evt) {//GEN-FIRST:event_nodeNumberFieldPropertyChange
-        Integer fieldWidth = (Integer)nodeNumberField.getValue();
-        int w = fieldWidth.intValue();
-        if (w <= 0) {
-            w = 2;
-        }
-        if ((w % 2) == 0) {
-            w++;
-            nodeNumberField.setValue(new Integer(w));
-        }
-        if (graphView != null) {
-            graphView.setFilterWidth(w - 1);
-        }
-    }//GEN-LAST:event_nodeNumberFieldPropertyChange
 
     private void quitMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_quitMenuItemActionPerformed
         doQuit();
@@ -532,10 +500,6 @@ public class TelemetryFrame extends JFrame implements Printable {
         setVisible(false);
         dispose();
 }//GEN-LAST:event_closeMenuItemActionPerformed
-
-    private void nodeNumberFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_nodeNumberFieldActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_nodeNumberFieldActionPerformed
 
     private void nodeNumberField1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_nodeNumberField1ActionPerformed
         // TODO add your handling code here:
@@ -557,6 +521,7 @@ public class TelemetryFrame extends JFrame implements Printable {
     private javax.swing.JPanel buttonPanel;
     private javax.swing.JMenuItem closeMenuItem;
     private javax.swing.JMenu fileMenu;
+    private javax.swing.JComboBox jComboBox1;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
     private javax.swing.JLabel jLabel6;
@@ -565,7 +530,6 @@ public class TelemetryFrame extends JFrame implements Printable {
     private javax.swing.JPanel jPanel3;
     private javax.swing.JSeparator jSeparator2;
     private javax.swing.JSeparator jSeparator3;
-    private javax.swing.JFormattedTextField nodeNumberField;
     private javax.swing.JFormattedTextField nodeNumberField1;
     private javax.swing.JMenuItem quitMenuItem;
     // End of variables declaration//GEN-END:variables

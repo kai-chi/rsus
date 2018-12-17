@@ -164,8 +164,23 @@ public class AccelerometerListener extends Thread implements PacketTypes {
     /**
      * Send a request to the remote SPOT to blink its LEDs.
      */
-    public void doBlink(byte MAC) {
-        sendCmd(BLINK_LEDS_REQ);
+    public void doBlink(Integer node) {
+        switch (node) {
+            case 1:
+                sendCmd(BLINK_LEDS_REQ_NODE_1);
+                break;
+            case 2:
+                sendCmd(BLINK_LEDS_REQ_NODE_2);
+                break;
+            case 3:
+                sendCmd(BLINK_LEDS_REQ_NODE_3);
+                break;
+            case 4:
+                sendCmd(BLINK_LEDS_REQ_NODE_4);
+                break;
+            default:
+                break;
+        }
     }
 
     /**

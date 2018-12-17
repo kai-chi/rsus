@@ -10,6 +10,8 @@ import com.sun.spot.resources.transducers.ILightSensor;
 import com.sun.spot.resources.transducers.SensorEvent;
 import com.sun.spot.resources.transducers.IAccelerometer3D;
 import com.sun.spot.resources.transducers.ITemperatureInput;
+import com.sun.spot.resources.transducers.ITriColorLEDArray;
+import com.sun.spot.resources.transducers.LEDColor;
 
 import com.sun.spot.sensorboard.peripheral.ADT7411Event;
 import com.sun.spot.sensorboard.peripheral.IADT7411ThresholdListener;
@@ -45,6 +47,7 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
     private ILightSensor light = (ILightSensor) Resources.lookup(ILightSensor.class);
     private ITemperatureInput temp = (ITemperatureInput) Resources.lookup(ITemperatureInput.class);
     private IAccelerometer3D accel = (IAccelerometer3D) Resources.lookup(IAccelerometer3D.class);
+    private ITriColorLEDArray leds = (ITriColorLEDArray) Resources.lookup(ITriColorLEDArray.class);
     private Node nodeList[] = new Node[3];
     private int nodeCount = 0;
     private LocateService locator;
@@ -354,15 +357,29 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
         rcvr = new PacketReceiver(hostConn);        // set up thread to receive & dispatch commands
         rcvr.setServiceName("Telemetry Command Server");
 
-        rcvr.registerHandler(this, BLINK_LEDS_REQ);
+        rcvr.registerHandler(this, BLINK_LEDS_REQ_NODE_1);
+        rcvr.registerHandler(this, BLINK_LEDS_REQ_NODE_2);
+        rcvr.registerHandler(this, BLINK_LEDS_REQ_NODE_3);
+        rcvr.registerHandler(this, BLINK_LEDS_REQ_NODE_4);
         rcvr.start();
     }
 
     public void handlePacket(byte type, Radiogram pkt) {
         try {
+            System.out.println("Received message from the server " + type);
             switch (type) {
-                case BLINK_LEDS_REQ:
-                    System.out.println("Blink: " + pkt.readUTF());
+                case BLINK_LEDS_REQ_NODE_1:
+                    blinkLEDs(2);
+                    break;
+                case BLINK_LEDS_REQ_NODE_2:
+                    sendToNode(nodeList[0].getMAC(), "BLINK,2");
+                    break;
+                case BLINK_LEDS_REQ_NODE_3:
+                    sendToNode(nodeList[1].getMAC(), "BLINK,2");
+                    break;
+                case BLINK_LEDS_REQ_NODE_4:
+                    sendToNode(nodeList[2].getMAC(), "BLINK,2");
+                    break;
             }
         } catch (Exception ex) {
             closeConnection();
@@ -386,5 +403,27 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
             System.out.println("Failed to close connection to host: " + ex);
         }
         locator.start();
+    }
+
+    private void blinkLEDs(int color) {
+        switch (color) {
+            case 0: // registration successful
+                leds.setColor(LEDColor.GREEN);
+                break;
+            case 1: // alarm
+                leds.setColor(LEDColor.RED);
+                break;
+            case 2: // ping
+                leds.setColor(LEDColor.YELLOW);
+                break;
+            default:
+                return;
+        }
+        for (int i = 0; i < 3; i++) {
+            leds.setOn();
+            Utils.sleep(300);
+            leds.setOff();
+            Utils.sleep(200);
+        }
     }
 }

@@ -184,19 +184,20 @@ public class NodeMain extends MIDlet implements IADT7411ThresholdListener {
     }
 
     private void blinkLEDs(int color) {
+        switch (color) {
+            case 0: // registration successful
+                leds.setColor(LEDColor.GREEN);
+                break;
+            case 1: // alarm
+                leds.setColor(LEDColor.RED);
+                break;
+            case 2: // ping
+                leds.setColor(LEDColor.YELLOW);
+                break;
+            default:
+                return;
+        }
         for (int i = 0; i < 3; i++) {
-            switch (color) {
-                case 0: // registration successful
-                    leds.setColor(LEDColor.GREEN);
-                    break;
-                case 1: // alarm
-                    leds.setColor(LEDColor.RED);
-                    break;
-                case 2: // ping
-                    leds.setColor(LEDColor.WHITE);
-                default:
-                    return;
-            }
             leds.setOn();
             Utils.sleep(300);
             leds.setOff();

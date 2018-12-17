@@ -21,6 +21,12 @@ public interface CommonTypes {
     public static final byte DISPLAY_SERVER_RESTART = 2;    // sent to any clients (broadcast)
     /** Host command to blink the remote SPOT's LEDs. */
     public static final byte BLINK_LEDS_REQ = 10;
+
+    public static final byte BLINK_LEDS_REQ_NODE_1 = 11;
+    public static final byte BLINK_LEDS_REQ_NODE_2 = 12;
+    public static final byte BLINK_LEDS_REQ_NODE_3 = 13;
+    public static final byte BLINK_LEDS_REQ_NODE_4 = 14;
+
     /** Host reply to indicate it is available. */
     public static final byte DISPLAY_SERVER_AVAIL_REPLY = 101;
 }
