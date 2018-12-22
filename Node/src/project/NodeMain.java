@@ -11,7 +11,6 @@ import javax.microedition.midlet.MIDletStateChangeException;
 import commons.SimpleNode;
 
 public class NodeMain extends SimpleNode {
-    private final int HEARTBEAT_FREQ = 10000;
 
     protected void startApp() throws MIDletStateChangeException {
         try {
@@ -47,11 +46,11 @@ public class NodeMain extends SimpleNode {
                     .append(",")
                     .append(tempValue)
                     .append(",")
-                    .append(accelXValue)
+                    .append(accXValue)
                     .append(",")
-                    .append(accelYValue)
+                    .append(accYValue)
                     .append(",")
-                    .append(accelZValue)
+                    .append(accZValue)
                     .toString();
             sendFrameToServer(frame);
             lastSentHeartbeat = System.currentTimeMillis();

@@ -26,4 +26,20 @@ public class SpotCommons {
         return s;
     }
 
+    public static String[] parseCSV(String line) {
+        int elements = 0;
+        String[] fields = new String[10];
+        String s = line;
+        while (s.length() > 0) {
+            int nextCommaIndex = s.indexOf(",");
+            if (nextCommaIndex == -1) {
+                fields[elements] = s;
+                break;
+            }
+            String field = s.substring(0, nextCommaIndex);
+            fields[elements++] = field;
+            s = s.substring(nextCommaIndex + 1);
+        }
+        return fields;
+    }
 }

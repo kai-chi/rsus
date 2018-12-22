@@ -1,4 +1,4 @@
-package commons;
+package project;
 
 import com.sun.spot.io.j2me.radiogram.RadiogramConnection;
 import com.sun.spot.peripheral.Spot;

@@ -2,52 +2,28 @@ package project.aggnode;
 
 import com.sun.spot.io.j2me.radiogram.Radiogram;
 import com.sun.spot.io.j2me.radiogram.RadiogramConnection;
-import com.sun.spot.peripheral.Spot;
-import com.sun.spot.resources.Resources;
-import com.sun.spot.resources.transducers.Condition;
-import com.sun.spot.resources.transducers.IConditionListener;
-import com.sun.spot.resources.transducers.ILightSensor;
-import com.sun.spot.resources.transducers.SensorEvent;
-import com.sun.spot.resources.transducers.IAccelerometer3D;
-import com.sun.spot.resources.transducers.ITemperatureInput;
-import com.sun.spot.resources.transducers.ITriColorLEDArray;
-import com.sun.spot.resources.transducers.LEDColor;
 
-import com.sun.spot.sensorboard.peripheral.ADT7411Event;
-import com.sun.spot.sensorboard.peripheral.IADT7411ThresholdListener;
 import com.sun.spot.util.IEEEAddress;
 import com.sun.spot.util.Utils;
 
 import java.io.IOException;
 import javax.microedition.io.Connector;
 import javax.microedition.io.Datagram;
-import javax.microedition.midlet.MIDlet;
 import javax.microedition.midlet.MIDletStateChangeException;
 import project.CommonTypes;
+import project.SimpleNode;
 import project.SpotCommons;
 
-public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
-        IConditionListener, LocateServiceListener, CommonTypes, PacketHandler {
+public class AggNodeMain extends SimpleNode implements
+        LocateServiceListener, CommonTypes, PacketHandler {
 
     private static final long SERVICE_CHECK_INTERVAL = 15000;
-    private final int RX_NODE_PORT = 112;
     private final String SERVER_MAC = "7f00.0101.0000.1001";
     private final int SERVER_TX_PORT = 111;
-    private final String MY_MAC = SpotCommons.getMyMAC(Spot.getInstance());
-    private final long ALARM_FREQUENCY = 10000;
     private final int NODE_TX_PORT = 46;
-    private final int TEMP_ALARM_THRESHOLD = 25;
-    private final int ACC_ALARM_THRESHOLD = 2;
-    private final long ALARM_FREQ = 5000;
 
     private RadiogramConnection txServerConn = null;
     private Datagram txServerDatagram;
-    private long heartbeatInterval = 10 * 1000; // interval in milliseconds
-    private long lastHeartbeatTimestamp = 0L;
-    private ILightSensor light = (ILightSensor) Resources.lookup(ILightSensor.class);
-    private ITemperatureInput temp = (ITemperatureInput) Resources.lookup(ITemperatureInput.class);
-    private IAccelerometer3D accel = (IAccelerometer3D) Resources.lookup(IAccelerometer3D.class);
-    private ITriColorLEDArray leds = (ITriColorLEDArray) Resources.lookup(ITriColorLEDArray.class);
     private Node nodeList[] = new Node[3];
     private int nodeCount = 0;
     private LocateService locator;
@@ -55,13 +31,6 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
     private PacketReceiver rcvr;
     private PacketTransmitter xmit;
     private boolean connected = false;
-    private long lastSentTempAlarm = 0;
-    private long lastSentAccAlarm = 0;
-
-    private int tempValue = 0;
-    private int accelXValue = 0;
-    private int accelYValue = 0;
-    private int accelZValue = 0;
 
 
     private void initialize() {
@@ -73,9 +42,9 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
 
     private void run() {
         locator.start();
+        startAlarmConditions();
         try {
-            RadiogramConnection rxConn = (RadiogramConnection) Connector.open("radiogram://:" + RX_NODE_PORT);
-            Datagram rxDatagram = rxConn.newDatagram(rxConn.getMaximumLength());
+            openRxConnection();
             txServerConn = (RadiogramConnection) Connector.open("radiogram://" + SERVER_MAC + ":" + SERVER_TX_PORT);
             txServerDatagram = (Datagram) txServerConn.newDatagram(txServerConn.getMaximumLength());
 
@@ -84,7 +53,7 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
                 readSensorValues();
                 checkForTempAlarms();
                 checkForAccAlarms();
-                checkForSendingHeartbeat();
+                sendHeartbeat();
             }
 
         } catch (IOException e) {
@@ -96,151 +65,43 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
         initialize();
         run();
     }
-    
-    private void parseIncomingData(RadiogramConnection rxConn, Datagram rxDatagram) throws IOException {
-        if (rxConn.packetsAvailable()) {
-            rxConn.receive(rxDatagram);
-            String rxData = rxDatagram.readUTF();
-            System.out.println("Received data: " + rxData);
-            parseRxData(rxData);
-        }
-    }
-
-    private void checkForSendingHeartbeat() throws IOException {
-        if (isReadyToSendHeartbeat()) {
-            String frame = getHeartbeatFrame();
-            sendToServer(frame);
-            lastHeartbeatTimestamp = System.currentTimeMillis();
-        }
-    }
 
     private void checkForTempAlarms() {
         for (int i = 0; i < nodeCount; i++) {
             Node n = nodeList[i];
-            if (n.isTempAlarmRaised() && (n.getLastTempAlarm() < System.currentTimeMillis() - ALARM_FREQUENCY)) {
+            if (n.isTempAlarmRaised() && (n.getLastTempAlarm() < System.currentTimeMillis() - ALARM_FREQ)) {
                 StringBuffer sb = new StringBuffer();
                 sb.append("ALARMTEMP")
                         .append(",")
                         .append(MY_MAC)
                         .append(",")
                         .append(n.getMAC());
-                sendToServer(sb.toString());
+                sendFrameToServer(sb.toString());
                 n.setTempAlarmRaised(false);
                 n.setLastTempAlarm(System.currentTimeMillis());
             }
         }
-        checkMyTempAlarm();
     }
 
     private void checkForAccAlarms() {
         for (int i = 0; i < nodeCount; i++) {
             Node n = nodeList[i];
-            if (n.isAccAlarmRaised() && (n.getLastAccAlarm() < System.currentTimeMillis() - ALARM_FREQUENCY)) {
+            if (n.isAccAlarmRaised() && (n.getLastAccAlarm() < System.currentTimeMillis() - ALARM_FREQ)) {
                 StringBuffer sb = new StringBuffer();
                 sb.append("ALARMACC")
                         .append(",")
                         .append(MY_MAC)
                         .append(",")
                         .append(n.getMAC());
-                sendToServer(sb.toString());
+                sendFrameToServer(sb.toString());
                 n.setAccAlarmRaised(false);
                 n.setLastAccAlarm(System.currentTimeMillis());
             }
         }
-        checkMyAccAlarm();
-    }
-
-    private void checkMyAccAlarm() {
-        if (lastSentAccAlarm < System.currentTimeMillis() - ALARM_FREQ
-                && ((accelXValue >= ACC_ALARM_THRESHOLD)
-                || (accelYValue >= ACC_ALARM_THRESHOLD)
-                || (accelZValue >= ACC_ALARM_THRESHOLD))) {
-            String frame = "ALARMACC," + MY_MAC + "," + MY_MAC;
-            sendToServer(frame);
-            lastSentAccAlarm = System.currentTimeMillis();
-        }
-    }
-
-    private void checkMyTempAlarm() {
-        if (lastSentTempAlarm < System.currentTimeMillis() - ALARM_FREQ
-                && (tempValue >= TEMP_ALARM_THRESHOLD)) {
-            String frame = "ALARMTEMP," + MY_MAC + "," + MY_MAC;
-            sendToServer(frame);
-            lastSentTempAlarm = System.currentTimeMillis();
-        }
-    }
-
-    private void readSensorValues() throws IOException {
-        tempValue = (int) temp.getCelsius();
-        accelXValue = (int) accel.getAccelX();
-        accelYValue = (int) accel.getAccelY();
-        accelZValue = (int) accel.getAccelZ();
-    }
-
-    private boolean isReadyToSendHeartbeat() {
-        long diff = System.currentTimeMillis() - lastHeartbeatTimestamp;
-        boolean timerReady = diff > heartbeatInterval;
-        boolean heartbeatSendStatus = true;
-        for (int i = 0; i < nodeCount; i++) {
-            heartbeatSendStatus = heartbeatSendStatus && nodeList[i].isLastHeartbeatSendStatus();
-        }
-        if (heartbeatSendStatus) {
-            if (timerReady) {
-                return true;
-            }
-        } else {
-            if (diff > 1.2 * heartbeatInterval) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private String getHeartbeatFrame() throws IOException {
-        StringBuffer sb = new StringBuffer("HEARTBEAT." + MY_MAC + ",");
-        for (int i = 0; i < nodeCount; i++) {
-            sb.append(nodeList[i].getMAC())
-                    .append(",")
-                    .append(nodeList[i].getLightValue())
-                    .append(",")
-                    .append(nodeList[i].getTempValue())
-                    .append(",")
-                    .append(nodeList[i].getAccelXValue())
-                    .append(",")
-                    .append(nodeList[i].getAccelYValue())
-                    .append(",")
-                    .append(nodeList[i].getAccelZValue());
-            nodeList[i].setLastHeartbeatSendStatus(true);
-        }
-        sb.append(MY_MAC)
-                .append(",")
-                .append(light.getValue())
-                .append(",")
-                .append((int) temp.getCelsius())
-                .append(",")
-                .append(accel.getAccelX())
-                .append(",")
-                .append(accel.getAccelY())
-                .append(",")
-                .append(accel.getAccelZ());
-        return sb.toString();
-    }
-
-    private void sendToServer(String frame) {
-        System.out.println("Send to server: " + frame);
-        try {
-            txServerDatagram.writeUTF(frame);
-            txServerConn.send(txServerDatagram);
-            txServerDatagram.reset();
-        } catch (IOException ex) {
-            System.out.println("Error sending frame to server " + ex);
-        }
     }
 
     private void sendToNode(String mac, String frame) {
-        RadiogramConnection tx = null;
-        Datagram txDatagram;
-        System.out.println("Sent to " + mac + " : " + frame);
+        System.out.println("Send to " + mac + " : " + frame);
         try {
             try {
                 tx = (RadiogramConnection) Connector.open("radiogram://" + mac + ":" + NODE_TX_PORT);
@@ -262,8 +123,8 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
 
     }
 
-    private void parseRxData(String data) {
-        String[] fields = parseCSV(data);
+    public void parseRxData(String data) {
+        String[] fields = SpotCommons.parseCSV(data);
         if (fields.length < 3) {
             return;
         }
@@ -283,7 +144,7 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
                     .append(MY_MAC)
                     .append(",")
                     .append(fields[1]);
-            sendToServer(sb.toString());
+            sendFrameToServer(sb.toString());
             sendToNode(fields[1], "BLINK,1");
         }
     }
@@ -299,40 +160,6 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
         System.out.println("Registerd a new Node");
         sendToNode(mac, "BLINK,0");
         return n;
-    }
-
-    private String[] parseCSV(String line) {
-        int elements = 0;
-        String[] fields = new String[10];
-        String s = line;
-        while (s.length() > 0) {
-            int nextCommaIndex = s.indexOf(",");
-            if (nextCommaIndex == -1) {
-                fields[elements] = s;
-                break;
-            }
-            String field = s.substring(0, nextCommaIndex);
-            fields[elements++] = field;
-            s = s.substring(nextCommaIndex + 1);
-        }
-        return fields;
-    }
-
-    protected void pauseApp() {
-        // This will never be called by the Squawk VM
-    }
-
-    protected void destroyApp(boolean arg0) throws MIDletStateChangeException {
-        // Only called if startApp throws any exception other than MIDletStateChangeException
-    }
-
-    public void thresholdChanged(ADT7411Event evt) {
-    }
-
-    public void thresholdExceeded(ADT7411Event evt) {
-    }
-
-    public void conditionMet(SensorEvent evt, Condition condition) {
     }
 
     public void serviceLocated(long serverAddress) {
@@ -405,25 +232,75 @@ public class AggNodeMain extends MIDlet implements IADT7411ThresholdListener,
         locator.start();
     }
 
-    private void blinkLEDs(int color) {
-        switch (color) {
-            case 0: // registration successful
-                leds.setColor(LEDColor.GREEN);
-                break;
-            case 1: // alarm
-                leds.setColor(LEDColor.RED);
-                break;
-            case 2: // ping
-                leds.setColor(LEDColor.YELLOW);
-                break;
-            default:
-                return;
+    public void sendHeartbeat() throws IOException {
+        if (isReadyToSendHeartbeat()) {
+            String frame = getHeartbeatFrame();
+            sendFrameToServer(frame);
+            lastSentHeartbeat = System.currentTimeMillis();
         }
-        for (int i = 0; i < 3; i++) {
-            leds.setOn();
-            Utils.sleep(300);
-            leds.setOff();
-            Utils.sleep(200);
+    }
+
+    private boolean isReadyToSendHeartbeat() {
+        long diff = System.currentTimeMillis() - lastSentHeartbeat;
+        boolean timerReady = diff > HEARTBEAT_FREQ;
+        boolean heartbeatSendStatus = true;
+        for (int i = 0; i < nodeCount; i++) {
+            heartbeatSendStatus = heartbeatSendStatus && nodeList[i].isLastHeartbeatSendStatus();
         }
+        if (heartbeatSendStatus) {
+            if (timerReady) {
+                return true;
+            }
+        } else {
+            if (diff > 1.2 * HEARTBEAT_FREQ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String getHeartbeatFrame() throws IOException {
+        StringBuffer sb = new StringBuffer("HEARTBEAT." + MY_MAC + ",");
+        for (int i = 0; i < nodeCount; i++) {
+            sb.append(nodeList[i].getMAC())
+                    .append(",")
+                    .append(nodeList[i].getLightValue())
+                    .append(",")
+                    .append(nodeList[i].getTempValue())
+                    .append(",")
+                    .append(nodeList[i].getAccelXValue())
+                    .append(",")
+                    .append(nodeList[i].getAccelYValue())
+                    .append(",")
+                    .append(nodeList[i].getAccelZValue());
+            nodeList[i].setLastHeartbeatSendStatus(true);
+        }
+        sb.append(MY_MAC)
+                .append(",")
+                .append(lightValue)
+                .append(",")
+                .append(tempValue)
+                .append(",")
+                .append(accXValue)
+                .append(",")
+                .append(accYValue)
+                .append(",")
+                .append(accZValue);
+        return sb.toString();
+    }
+
+    public void sendFrameToServer(String frame) {
+        System.out.println("Send to server: " + frame);
+        try {
+            txServerDatagram.writeUTF(frame);
+            txServerConn.send(txServerDatagram);
+            txServerDatagram.reset();
+        } catch (IOException ex) {
+            System.out.println("Error sending frame to server " + ex);
+        }
+    }
+
+    public int getRxPort() {
+        return 112;
     }
 }
