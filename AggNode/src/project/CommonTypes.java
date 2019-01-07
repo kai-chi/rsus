@@ -5,6 +5,7 @@
 package project;
 
 /**
+ * Types of messages and other constants shared for the communication between Server and AggNodes
  *
  * @author userrsus
  */
@@ -22,9 +23,21 @@ public interface CommonTypes {
     /** Host command to blink the remote SPOT's LEDs. */
     public static final byte BLINK_LEDS_REQ = 10;
 
+    /**
+     * Command for the AggNode to blink its LEDs
+     */
     public static final byte BLINK_LEDS_REQ_NODE_1 = 11;
+    /**
+     * Command for the first Node attached to the AggNode to blink its LEDs
+     */
     public static final byte BLINK_LEDS_REQ_NODE_2 = 12;
+    /**
+     * Command for the second Node attached to the AggNode to blink its LEDs
+     */
     public static final byte BLINK_LEDS_REQ_NODE_3 = 13;
+    /**
+     * Command for the third Node attached to the AggNode to blink its LEDs
+     */
     public static final byte BLINK_LEDS_REQ_NODE_4 = 14;
 
     /** Host reply to indicate it is available. */

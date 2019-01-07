@@ -14,6 +14,10 @@ import project.CommonTypes;
 import project.SimpleNode;
 import project.SpotCommons;
 
+/**
+ *
+ * @author userrsus
+ */
 public class AggNodeMain extends SimpleNode implements
         LocateServiceListener, CommonTypes, PacketHandler {
 
@@ -61,6 +65,10 @@ public class AggNodeMain extends SimpleNode implements
         }
     }
 
+    /**
+     *
+     * @throws MIDletStateChangeException
+     */
     protected void startApp() throws MIDletStateChangeException {
         initialize();
         run();
@@ -123,6 +131,10 @@ public class AggNodeMain extends SimpleNode implements
 
     }
 
+    /**
+     * Parses data received from attached Nodes
+     * @param data String to parse
+     */
     public void parseRxData(String data) {
         String[] fields = SpotCommons.parseCSV(data);
         if (fields.length < 3) {
@@ -213,6 +225,9 @@ public class AggNodeMain extends SimpleNode implements
         }
     }
 
+    /**
+     * Closes the connection with the Server
+     */
     public void closeConnection() {
         if (!connected) {
             return;
@@ -232,6 +247,10 @@ public class AggNodeMain extends SimpleNode implements
         locator.start();
     }
 
+    /**
+     * Sends the heartbeat message containing info about all of the Nodes to the Server
+     * @throws IOException
+     */
     public void sendHeartbeat() throws IOException {
         if (isReadyToSendHeartbeat()) {
             String frame = getHeartbeatFrame();
@@ -289,6 +308,10 @@ public class AggNodeMain extends SimpleNode implements
         return sb.toString();
     }
 
+    /**
+     * Sends frame to the server
+     * @param frame String to send to the server
+     */
     public void sendFrameToServer(String frame) {
         System.out.println("Send to server: " + frame);
         try {
@@ -300,6 +323,10 @@ public class AggNodeMain extends SimpleNode implements
         }
     }
 
+    /**
+     * Gets the RX port 
+     * @return
+     */
     public int getRxPort() {
         return 112;
     }

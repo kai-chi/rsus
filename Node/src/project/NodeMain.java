@@ -10,8 +10,17 @@ import javax.microedition.io.Datagram;
 import javax.microedition.midlet.MIDletStateChangeException;
 import commons.SimpleNode;
 
+/**
+ * NodeMain class is the main class of the Node component.
+ *
+ * @author userrsus
+ */
 public class NodeMain extends SimpleNode {
 
+    /**
+     * N/A
+     * @throws MIDletStateChangeException
+     */
     protected void startApp() throws MIDletStateChangeException {
         try {
             openRxConnection();

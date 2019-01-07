@@ -19,36 +19,91 @@ import javax.microedition.midlet.MIDlet;
 import javax.microedition.midlet.MIDletStateChangeException;
 
 /**
- *
+ * SimpleNode abstract class represents basic functionality of every node.
  * @author userrsus
  */
 public abstract class SimpleNode extends MIDlet {
 
+    /**
+     * MAC address of the device
+     */
     public final String MY_MAC = SpotCommons.getMyMAC(Spot.getInstance());
     private final double TEMP_ALARM_THRESHOLD = 25.0;
     private final int ACC_ALARM_THRESHOLD = 2;
+    /**
+     * How often alarm can be reported in ms
+     */
     public final long ALARM_FREQ = 5000;
+    /**
+     * How often heartbeat can be reported in ms
+     */
     public final int HEARTBEAT_FREQ = 10000;
     private final int CHECK_ALARM_FREQ = 1000;
     private ITemperatureInput temp = (ITemperatureInput) Resources.lookup(ITemperatureInput.class);
     private IAccelerometer3D acc = (IAccelerometer3D) Resources.lookup(IAccelerometer3D.class);
     private ILightSensor light = (ILightSensor) Resources.lookup(ILightSensor.class);
     private ITriColorLEDArray leds = (ITriColorLEDArray) Resources.lookup(ITriColorLEDArray.class);
+    /**
+     * Timestamp of the last sent heartbeat
+     */
     public long lastSentHeartbeat = 0;
+    /**
+     * Timestamp of the last sent fire alarm
+     */
     public long lastSentTempAlarm = 0;
+    /**
+     * Timestamp of the last sent vandalism alarm
+     */
     public long lastSentAccAlarm = 0;
+    /**
+     * Current temperature value
+     */
     public int tempValue = 0;
+    /**
+     * Current accelerometer X-axis value
+     */
     public int accXValue = 0;
+    /**
+     * Current accelerometer Y-axis value
+     */
     public int accYValue = 0;
+    /**
+     * Current accelerometer Z-axis value
+     */
     public int accZValue = 0;
+    /**
+     * Current light sensor value
+     */
     public int lightValue = 0;
+    /**
+     * RadiogramConnection responsible for tx communication
+     */
     public RadiogramConnection tx = null;
+    /**
+     * Datagram for tx communication
+     */
     public Datagram txDatagram;
+    /**
+     * RadiogramConnection responsible for rx communication
+     */
     public RadiogramConnection rxConn = null;
+    /**
+     * Datagram for rx communication
+     */
     public Datagram rxDatagram;
 
+    /**
+     * Sends heartbeat message to the node higher in the hierarchy -
+     * Node sends to AggNode, AggNode sends to the server
+     * @throws IOException
+     */
     public abstract void sendHeartbeat() throws IOException;
 
+    /**
+     * Sends frame towards the server
+     * @param frame String to be send to the server
+     * @throws IOException
+     */
     public abstract void sendFrameToServer(String frame) throws IOException;
     //temp callback
     private IConditionListener tempListener = new IConditionListener() {
@@ -102,11 +157,18 @@ public abstract class SimpleNode extends MIDlet {
         }
     };
 
+    /**
+     * Starts monitoring the alarm thresholds
+     */
     public void startAlarmConditions() {
         fireCondition.start();
         vandalismCondition.start();
     }
 
+    /**
+     * Reads current sensor values and stores in the variables
+     * @throws IOException
+     */
     public void readSensorValues() throws IOException {
         tempValue = (int) temp.getCelsius();
         accXValue = (int) acc.getAccelX();
@@ -115,12 +177,27 @@ public abstract class SimpleNode extends MIDlet {
         lightValue = light.getValue();
     }
 
+    /**
+     * N/A
+     */
     protected void pauseApp() {
     }
 
+    /**
+     * N/A
+     * @param unconditional
+     * @throws MIDletStateChangeException
+     */
     protected void destroyApp(boolean unconditional) throws MIDletStateChangeException {
     }
 
+    /**
+     * Blinks with LEDS in a given color:
+     * 0 - GREEN
+     * 1 - RED
+     * 2 - YELLOW
+     * @param color integer representing color to blink with
+     */
     public void blinkLEDs(int color) {
         switch (color) {
             case 0: // registration successful
@@ -143,8 +220,18 @@ public abstract class SimpleNode extends MIDlet {
         }
     }
 
+    /**
+     * Parses data received
+     * @param data String data to parse
+     */
     public abstract void parseRxData(String data);
 
+    /**
+     * Receives data from RadiogramConnection and obtains the message as a String
+     * @param rxConn
+     * @param rxDatagram
+     * @throws IOException
+     */
     public void parseIncomingData(RadiogramConnection rxConn, Datagram rxDatagram) throws IOException {
         if (rxConn.packetsAvailable()) {
             rxConn.receive(rxDatagram);
@@ -154,8 +241,16 @@ public abstract class SimpleNode extends MIDlet {
         }
     }
 
+    /**
+     * Gets the port for rx communication
+     * @return
+     */
     public abstract int getRxPort();
 
+    /**
+     * Opens rx connection
+     * @throws IOException
+     */
     public void openRxConnection() throws IOException {
         rxConn = (RadiogramConnection) Connector.open("radiogram://:" + getRxPort());
         rxDatagram = rxConn.newDatagram(rxConn.getMaximumLength());

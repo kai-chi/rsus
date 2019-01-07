@@ -9,11 +9,16 @@ import com.sun.spot.peripheral.ISpot;
 import com.sun.spot.util.IEEEAddress;
 
 /**
- *
+ * SpotCommons is a library of commonly used methods across all components
  * @author userrsus
  */
 public class SpotCommons {
 
+    /**
+     *
+     * @param spot
+     * @return
+     */
     public static String getMyMAC(ISpot spot) {
         long address = spot.getRadioPolicyManager().getIEEEAddress();
 //        if ((address & 1) == 0) {
@@ -26,6 +31,11 @@ public class SpotCommons {
         return s;
     }
 
+    /**
+     * Parses a CSV message into an array of String
+     * @param line CSV message
+     * @return array of String with the values
+     */
     public static String[] parseCSV(String line) {
         int elements = 0;
         String[] fields = new String[10];
